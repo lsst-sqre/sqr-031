@@ -89,7 +89,7 @@ Start the k3s server with the following commands:
   export K3S_PORT=6443
   export K3S_URL=http://localhost:${K3S_PORT}
   export K3S_TOKEN=$(date | base64)
-  export HOST_PATH=<local path to store persistent data>
+  export HOST_PATH=/data # change depending on your host
   export CONTAINER_PATH=/opt/local-path-provisioner
   sudo docker run  -d --tmpfs /run --tmpfs /var/run -v ${HOST_PATH}:${CONTAINER_PATH} -e K3S_URL=${K3S_URL} -e K3S_TOKEN=${K3S_TOKEN} --privileged --network host --name master2 docker.io/rancher/k3s:v0.5.0-rc1 server --https-listen-port ${K3S_PORT} --no-deploy traefik
 
@@ -151,14 +151,13 @@ and start the worker(s):
   export SERVER_URL=https://<master external IP>:${K3S_PORT}
   export NODE_TOKEN=$(cat node-token)
   export WORKER=kube-0
-  export HOST_PATH=<local path to store persistent data>
+  export HOST_PATH=/data # change depending on your host
   export CONTAINER_PATH=/opt/local-path-provisioner
   sudo docker run -d --tmpfs /run --tmpfs /var/run -v ${HOST_PATH}:${CONTAINER_PATH} -e K3S_URL=${SERVER_URL} -e K3S_TOKEN=${NODE_TOKEN} --privileged --name ${WORKER} rancher/k3s:v0.5.0-rc1
 
 .. note::
 
-	By default ``/opt/local-path-provisioner`` will be used across all the nodes to store persistent volume data. See the `local-path provisioner configuration <https://github.com/rancher/local-path-provisioner#configuration>`_ to customize this path on each node.
-
+	By default ``/opt/local-path-provisioner`` will be used across all the nodes to store persistent volume data, see `local-path provisioner configuration <https://github.com/rancher/local-path-provisioner#configuration>`_.
 
 Deploy the DM-EFD
 =================
