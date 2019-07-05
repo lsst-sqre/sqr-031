@@ -80,6 +80,16 @@ We assume you have a Linux box with `Docker CE <https://docs.docker.com/install/
 
   We have tested the DM-EFD deployment on k3s using Docker Desktop for Mac, but it `cannot route traffic from the host to the container <https://docs.docker.com/docker-for-mac/networking/>`_ (``--network host`` option). That limits our deployment to Linux.
 
+Configure Docker to start on boot
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+CentOS uses ``systemd`` to manage which services start when the system boots. Run the following to configure `Docker` to start on boot.
+
+.. code-block:: bash
+
+  sudo systemctl enable docker
+
+
 Start the k3s master
 --------------------
 
@@ -237,6 +247,34 @@ If everything is correct you should see an output similar to this, indicating th
   influxdb_fqdn = test-influxdb-efd.lsst.codes
   nginx_ingress_ip = 140.252.32.142
   prometheus_fqdn = test-prometheus-efd.lsst.codes
+
+
+The Kafka cluster can be reached at ``test-efd0.lsst.codes:9094``.
+
+Testing the installation
+========================
+
+The installation can be tested using `kafkacat <https://docs.confluent.io/current/app-development/kafkacat-usage.html>`_  a command line utility implemented with ``librdkafka`` the Apache Kafka C/C++ client library.
+
+Run in producer mode (-P) to produce messages for a test topic:
+
+.. code-block:: bash
+
+  kafkacat -P -b test-efd0.lsst.codes:9094 -t test_topic
+  Hello EFD!
+  ^D
+
+Run in Metadata listing mode (-L) to retrieve metadata from the cluster:
+
+.. code-block:: bash
+
+  kafkacat -L -b test-efd0.lsst.codes:9094
+
+The ``-d`` option enables ``librdkafka`` debugging. For instance, ``-d broker`` can be used to debug connection issues with the cluster:
+
+.. code-block:: bash
+
+  kafkacat -L -b test-efd0.lsst.codes:9094 -d broker
 
 
 Monitoring
