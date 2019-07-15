@@ -53,37 +53,45 @@
 Why are we doing this?
 ======================
 
-The DM-EFD is a solution based on Kafka and InfluxDB for recording the LSST telemetry and events. It was `prototyped and tested with the simulator for the M1M3 subsystem <https://sqr-029.lsst.io/#live-sal-experiment-with-avro-transformations>`_. The next logical step is to deploy and test the DM-EFD in a more realistic environment.
+The DM-EFD is a solution based on Kafka and InfluxDB for recording telemetry, commands, and events for LSST. It was `prototyped and tested with the simulator for the M1M3 subsystem <https://sqr-029.lsst.io/#live-sal-experiment-with-avro-transformations>`_. The next logical step is to deploy and test the DM-EFD with real hardware.
 
-The `Tucson test stand` is currently testing the Auxilary Telescope Camera (ATCamera) and needs to record telemetry from these tests. Soon, we will have to deploy the DM-EFD at the `NCSA test stand` and at the summit for the Auxiliary Telescope, and finally for the main telescope and the whole observatory.
+The Auxilary Telescope Camera (ATCamera) is being tested at the Tucson lab and it presents a good opportunity for testing the DM-EFD by recording data from these tests.
 
-In this scenario the ability to deploy the DM-EFD on heterogeneous environments quickly, and ensure the reproducibility of the deployments is crucial. To solve the portability problem we adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_. To manage and automate the deployments we use a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_.
+We might need to deploy the DM-EFD at the Summit, Base facility, and LDF. Thus, the ability of deploying the DM-EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, and a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_ to manage and automate the deployments.
 
 In this technote, we demonstrate that we can deploy the DM-EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("kubes"), a lightweight Kubernetes using the same Terraform modules and Helm charts that we used in our Google Could deployment. We also provide instructions on how to operate and use the DM-EFD system.
 
 
-Deploy k3s ("kubes")
-====================
+The ATCamera test environment
+=============================
+
+As of June 2019, the ATCamera test environment at the Tucson lab runs SAL 3.9. The following subsystems are being tested and produce data: ``ATCamera``, ``ATHeaderService``, ``ATArchiver``, ``ATMonochromator``, ``ATSpectrograph``, and ``Electrometer``.
+
+Kafka writers are responsible for sending messages from each SAL topic to the Kafka brokers.
+
+The DM-EFD will be deployed on a dedicated machine ``ts-csc-01 (140.252.32.142)`` and the first step for that is to provision a Kubernetes cluster.
+
+Provisioning a k3s ("kubes") cluster
+====================================
 
 `k3s <https://github.com/rancher/k3s>`_ is a lightweight Kubernetes that we can run in a container.
-
 
 Requirements
 ------------
 
-We assume you have a Linux box with `Docker CE <https://docs.docker.com/install/linux/docker-ce/centos/>`_,  `kubectl <https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-on-linux>`_ installed. We used:
+We assume a Linux box running Centos 7. We've installed `Docker CE <https://docs.docker.com/install/linux/docker-ce/centos/>`_ and `kubectl <https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-on-linux>`_:
 
  - Docker CE 18.09.6
  - kubectl 1.14.1
 
 .. note::
 
-  We have tested the DM-EFD deployment on k3s using Docker Desktop for Mac, but it `cannot route traffic from the host to the container <https://docs.docker.com/docker-for-mac/networking/>`_ (``--network host`` option). That limits our deployment to Linux.
+  We also tried k3s locally, on Docker Desktop for Mac, but it `cannot route traffic from the host to the container <https://docs.docker.com/docker-for-mac/networking/>`_ (the ``--network host`` option does not work).
 
 Configure Docker to start on boot
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------------
 
-CentOS uses ``systemd`` to manage which services start when the system boots. Run the following to configure `Docker` to start on boot.
+CentOS uses ``systemd`` to manage which services start when the system boots. Run the following to configure Docker to start on boot.
 
 .. code-block:: bash
 
@@ -102,21 +110,21 @@ Start the k3s master with the following commands:
   export K3S_TOKEN=$(date | base64)
   export HOST_PATH=/data # change depending on your host
   export CONTAINER_PATH=/opt/local-path-provisioner
-  sudo docker run  -d --tmpfs /run --tmpfs /var/run -v ${HOST_PATH}:${CONTAINER_PATH} -e K3S_URL=${K3S_URL} -e K3S_TOKEN=${K3S_TOKEN} --privileged --network host --name master docker.io/rancher/k3s:v0.5.0-rc1 server --https-listen-port ${K3S_PORT} --no-deploy traefik
+  sudo docker run  -d --restart always --tmpfs /run --tmpfs /var/run --volume ${HOST_PATH}:${CONTAINER_PATH} -e K3S_URL=${K3S_URL} -e K3S_TOKEN=${K3S_TOKEN} --privileged --network host --name master docker.io/rancher/k3s:v0.5.0-rc1 server --https-listen-port ${K3S_PORT} --no-deploy traefik
 
-Note that we are not deploying `Traefik` because the DM-EFD already includes the `NGINX Ingress Controller`.
+The  ``--restart always`` option ensures that the k3s master is `automatically restarted <https://docs.docker.com/config/containers/start-containers-automatically/>`_ after a system reboot.
 
-To connect to the master you need to copy the kubeconfig file from the container:
+Data is persisted at ``$HOST_PATH`` with the ``--volume`` option (see also :ref:`local-path-provisioner`).
+
+With the ``--network host`` option, network traffic is routed from the host to the container, we need that in order to reach the different services running on k3s.
+
+Note that we are not deploying `Traefik Ingress Controller` which is included in the k3s docker image, because the DM-EFD already deploys the `NGINX Ingress Controller`.
+
+To connect to the master you need to copy the kubeconfig file from the container, and set the ``KUBECONFIG`` environment variable so that `kubectl` knows how to connect to the cluster:
 
 .. code-block:: bash
 
   sudo docker cp master:/etc/rancher/k3s/k3s.yaml k3s.yaml
-
-
-at this point you can access the cluster:
-
-.. code-block:: bash
-
   export KUBECONFIG=$(pwd)/k3s.yaml
   kubectl cluster-info
 
@@ -125,6 +133,9 @@ at this point you can access the cluster:
 
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 
+To connect to the cluster from an another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by ``140.252.32.142``.
+
+.. _local-path-provisioner:
 
 Deploy the local-path provisioner
 ---------------------------------
@@ -149,7 +160,7 @@ At this point you should see the following pods running in the cluster:
 Add workers (optional)
 ----------------------
 
-If there are more machines you can easily add workers to the cluster. Copy the ``node-token`` from the master:
+If there are more machines, you can easily add workers to the cluster. Copy the ``node-token`` from the master:
 
 .. code-block:: bash
 
@@ -249,18 +260,18 @@ If everything is correct you should see an output similar to this, indicating th
   prometheus_fqdn = test-prometheus-efd.lsst.codes
 
 
-The Kafka cluster can be reached at ``test-efd0.lsst.codes:9094``.
+The Kafka cluster can be reached at ``test-efd.lsst.codes:31090``.
 
-Testing the installation
-========================
+Testing the DM-EFD
+==================
 
-The installation can be tested using `kafkacat <https://docs.confluent.io/current/app-development/kafkacat-usage.html>`_  a command line utility implemented with ``librdkafka`` the Apache Kafka C/C++ client library.
+The DM-EFD deployment can be tested using `kafkacat <https://docs.confluent.io/current/app-development/kafkacat-usage.html>`_  a command line utility implemented with ``librdkafka`` the Apache Kafka C/C++ client library.
 
 Run in producer mode (-P) to produce messages for a test topic:
 
 .. code-block:: bash
 
-  kafkacat -P -b test-efd0.lsst.codes:9094 -t test_topic
+  kafkacat -P -b test-efd.lsst.codes:31090 -t test_topic
   Hello EFD!
   ^D
 
@@ -268,19 +279,19 @@ Run in Metadata listing mode (-L) to retrieve metadata from the cluster:
 
 .. code-block:: bash
 
-  kafkacat -L -b test-efd0.lsst.codes:9094
+  kafkacat -L -b test-efd0.lsst.codes:31090
 
 The ``-d`` option enables ``librdkafka`` debugging. For instance, ``-d broker`` can be used to debug connection issues with the cluster:
 
 .. code-block:: bash
 
-  kafkacat -L -b test-efd0.lsst.codes:9094 -d broker
+  kafkacat -L -b test-efd0.lsst.codes:31090 -d broker
 
 
 Monitoring
 ==========
 
-The DM-EFD deployment includes `dashboards for monitoring the k3s cluster and Kafka <https://test-grafana-efd.lsst.codes>`_ instrumented by `Prometheus <https://test-prometheus-efd.lsst.codes>`_ metrics. You can login with your GitHub credentials if you are on the GitHub lsst-sqre organization.
+The DM-EFD deployment includes `dashboards for monitoring the k3s cluster and Kafka <https://test-grafana-efd.lsst.codes>`_ instrumented by `Prometheus <https://test-prometheus-efd.lsst.codes>`_ metrics. You can login with your GitHub credentials if you are a member of the ``lsst-sqre`` organization.
 
 
 Using the DM-EFD
