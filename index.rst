@@ -55,12 +55,11 @@ Why are we doing this?
 
 The DM-EFD is a solution based on Kafka and InfluxDB for recording telemetry, commands, and events for LSST. It was `prototyped and tested with the simulator for the M1M3 subsystem <https://sqr-029.lsst.io/#live-sal-experiment-with-avro-transformations>`_. The next logical step is to deploy and test the DM-EFD with real hardware.
 
-The Auxilary Telescope Camera (ATCamera) is being tested at the Tucson lab and it presents a good opportunity for testing the DM-EFD by recording data from these tests.
+The Auxilary Telescope Camera (ATCamera) is being tested at the Tucson lab, and it presents an excellent opportunity for testing the DM-EFD by recording data from these tests.
 
-We might need to deploy the DM-EFD at the Summit, Base facility, and LDF. Thus, the ability of deploying the DM-EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, and a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_ to manage and automate the deployments.
+We might need to deploy the DM-EFD at the Summit, Base facility, and LDF. Thus, the ability to deploy the DM-EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, and a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_ to manage and automate the deployments.
 
-In this technote, we demonstrate that we can deploy the DM-EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("kubes"), a lightweight Kubernetes using the same Terraform modules and Helm charts that we used in our Google Could deployment. We also provide instructions on how to operate and use the DM-EFD system.
-
+In this technote, we demonstrate that we can deploy the DM-EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("kubes"), a lightweight Kubernetes using the same Terraform modules and Helm charts that we used at Google Could. We also provide instructions on how to operate and use the DM-EFD system.
 
 The ATCamera test environment
 =============================
@@ -69,12 +68,12 @@ As of June 2019, the ATCamera test environment at the Tucson lab runs SAL 3.9. T
 
 Kafka writers are responsible for sending messages from each SAL topic to the Kafka brokers.
 
-The DM-EFD will be deployed on a dedicated machine ``ts-csc-01 (140.252.32.142)`` and the first step for that is to provision a Kubernetes cluster.
+The DM-EFD runs on a dedicated machine ``ts-csc-01 (140.252.32.142)``. The first step to deploy it is to provision a Kubernetes cluster.
 
 Provisioning a k3s ("kubes") cluster
 ====================================
 
-`k3s <https://github.com/rancher/k3s>`_ is a lightweight Kubernetes that we can run in a container.
+`k3s <https://github.com/rancher/k3s>`_ is a lightweight Kubernetes that runs in a container.
 
 Requirements
 ------------
@@ -86,7 +85,7 @@ We assume a Linux box running Centos 7. We've installed `Docker CE <https://docs
 
 .. note::
 
-  We also tried k3s locally, on Docker Desktop for Mac, but it `cannot route traffic from the host to the container <https://docs.docker.com/docker-for-mac/networking/>`_ (the ``--network host`` option does not work).
+  We also tried k3s locally, on Docker Desktop for Mac, but it `can not route traffic from the host to the container <https://docs.docker.com/docker-for-mac/networking/>`_ (the ``--network host`` option does not work).
 
 Configure Docker to start on boot
 ---------------------------------
@@ -116,7 +115,7 @@ The  ``--restart always`` option ensures that the k3s master is `automatically r
 
 Data is persisted at ``$HOST_PATH`` with the ``--volume`` option (see also :ref:`local-path-provisioner`).
 
-With the ``--network host`` option, network traffic is routed from the host to the container, we need that in order to reach the different services running on k3s.
+The ``--network host`` option routes network traffic from the host to the container, we need that to reach the different services running inside k3s.
 
 Note that we are not deploying `Traefik Ingress Controller` which is included in the k3s docker image, because the DM-EFD already deploys the `NGINX Ingress Controller`.
 
@@ -133,14 +132,14 @@ To connect to the master you need to copy the kubeconfig file from the container
 
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 
-To connect to the cluster from an another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by ``140.252.32.142``.
+To connect to the cluster from another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by ``140.252.32.142``.
 
 .. _local-path-provisioner:
 
 Deploy the local-path provisioner
 ---------------------------------
 
-The `local-path provisioner <https://github.com/rancher/local-path-provisioner>`_ will create ``hostPath`` persistent volumes on the node automatically. The directory ``/opt/local-path-provisioner`` will be used as the path for provisioning. The provisioner will be installed in the ``local-path-storage`` namespace by default.
+The `local-path provisioner <https://github.com/rancher/local-path-provisioner>`_ creates ``hostPath`` persistent volumes on the node automatically. The directory ``/opt/local-path-provisioner`` is used as the path for provisioning. The provisioner is installed in the ``local-path-storage`` namespace by default.
 
 
 .. code-block:: bash
@@ -160,7 +159,7 @@ At this point you should see the following pods running in the cluster:
 Add workers (optional)
 ----------------------
 
-If there are more machines, you can easily add workers to the cluster. Copy the ``node-token`` from the master:
+If there are other machines, you can easily add workers to the cluster. Copy the ``node-token`` from the master:
 
 .. code-block:: bash
 
@@ -179,25 +178,25 @@ and start the worker(s):
 
 .. note::
 
-	By default ``/opt/local-path-provisioner`` will be used across all the nodes to store persistent volume data, see `local-path provisioner configuration <https://github.com/rancher/local-path-provisioner#configuration>`_.
+	By default ``/opt/local-path-provisioner`` is used across all the nodes to store persistent volume data, see `local-path provisioner configuration <https://github.com/rancher/local-path-provisioner#configuration>`_.
 
 Deploy the DM-EFD
 =================
 
-Once the cluster is ready we can deploy the DM-EFD.
+Once the cluster is ready, we can deploy the DM-EFD.
 
 Requirements
 ------------
 
  - AWS credentials (we save the deployment configuration to an S3 bucket and create names for our services on Route53)
- - TLS/SSL certificates for the ``lsst.codes`` domain (certificates are shared via SQuaRE Dropbox account)
- - Deployment configuration for the DM-EFD test environment (secrets are shared via SQuaRE 1Password account)
+ - TLS/SSL certificates for the ``lsst.codes`` domain (we share certificates via SQuaRE Dropbox account)
+ - Deployment configuration for the DM-EFD test environment (we share secrets via SQuaRE 1Password account)
 
 .. note::
 
-  The current mechanism to share secrets and certificates is not ideal, we still need to integrate our DM-EFD deployment with the `Vault service recently implemented by SQuaRE <https://dmtn-112.lsst.io/>`_.
+  The current mechanism to share secrets and certificates is not ideal. We still need to integrate our DM-EFD deployment with the `Vault service implemented by SQuaRE <https://dmtn-112.lsst.io/>`_.
 
-We automate the deployment of the DM-EFD with `Terraform <https://www.terraform.io/>`_ and `Helm <https://helm.sh/>`_.  `Terragrunt <https://www.gruntwork.io/>`_ is used to manage the different deployment environments (dev, test, stage, and production) while keeping the Terraform modules environment-agnostic. We also use Terragrunt to save the Terraform configuration and the state of a particular deployment remotely.
+We automate the deployment of the DM-EFD with `Terraform <https://www.terraform.io/>`_ and `Helm <https://helm.sh/>`_.  `Terragrunt <https://www.gruntwork.io/>`_ is used to manage the different deployment environments (dev, test, and production) while keeping the Terraform modules environment-agnostic. We also use Terragrunt to save the Terraform configuration and the state of a particular deployment remotely.
 
 Install Terragrunt, Terraform, and Helm.
 
@@ -238,7 +237,7 @@ The DM-EFD deployment configuration on k3s is defined by a set of Terraform vari
 
 Edit the ``terraform.tfvars`` file with the values obtained from the SQuaRE 1Password account. Search for ``terraform vars (efd test)``.
 
-Finally deploy the DM-EFD with the following commands:
+Finally, deploy the DM-EFD with the following commands:
 
 .. code-block:: bash
 
@@ -249,7 +248,7 @@ Finally deploy the DM-EFD with the following commands:
 Outputs
 -------
 
-If everything is correct you should see an output similar to this, indicating the services deployed:
+If everything is correct you should see an output similar to this, indicating the new services deployed:
 
 .. code-block:: bash
 
@@ -297,17 +296,14 @@ The DM-EFD deployment includes `dashboards for monitoring the k3s cluster and Ka
 Using the DM-EFD
 ================
 
-In this section we document some procedures that are useful for operating
+In this section, we document some procedures that are useful for operating
 the DM-EFD. Please refer to `DM-EFD prototype implementation based on Kafka and InfluxDB <https://sqr-029.lsst.io>`_ for an overview of the DM-EFD system.
 
-.. note::
-
-  As of May 23, 2019 the `Tucson test stand` runs SAL version 3.8. This version does not include the Kafka writers. We are waiting for SAL 3.9 or later to be deployed to continue this work. The commands presented below were not test on that environment yet, but they illustrate how the interaction with the cluster to perform tasks like initialize a new SAL subsystem, check on the status of the SAL transform apps InfluxDB Sink connector, and retrieve data from the DM-EFD.
 
 Initialize a SAL subsystem
 --------------------------
 
-The following command will initialize a SAL subsystem, deploy the corresponding SAL transform app and configure the InfluxDB Sink Connector to consume the SAL topics of that subsystem. In the example, the ``ATCamera``:
+The following command initializes a SAL subsystem, deploy the corresponding SAL transform app and configure the InfluxDB Sink Connector to consume the SAL topics of that subsystem. In the example, we initialize the ``ATCamera`` subsystem:
 
 .. code-block:: bash
 
@@ -337,7 +333,7 @@ Inspecting the Kafka connect logs:
 Getting data from the DM-EFD
 ----------------------------
 
-InfluxDB provides an `HTTP API <https://docs.influxdata.com/influxdb/v1.7/tools/api/>`_ for accessing the data. A Python code snippet to get data from a particular SAL topic from the DM-EFD is shown below. In this example, we retrieve the `Temperature for CCD 0 in the last 24h`:
+InfluxDB provides an `HTTP API <https://docs.influxdata.com/influxdb/v1.7/tools/api/>`_ for accessing the data. Here we show a Python code snippet to get data from a particular SAL topic from the DM-EFD. In the example, we retrieve the `Temperature for CCD 0 in the last 24h`:
 
 .. code-block:: python3
 
