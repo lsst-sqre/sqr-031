@@ -97,10 +97,10 @@ CentOS uses ``systemd`` to manage which services start when the system boots. Ru
   sudo systemctl enable docker
 
 
-Start the k3s master
---------------------
+Run the k3s master
+------------------
 
-Start the k3s master with the following commands:
+Run the k3s master with the following commands:
 
 .. code-block:: bash
 
@@ -293,6 +293,36 @@ Monitoring
 The DM-EFD deployment includes `dashboards for monitoring the k3s cluster and Kafka <https://test-grafana-efd.lsst.codes>`_ instrumented by `Prometheus <https://test-prometheus-efd.lsst.codes>`_ metrics. You can login with your GitHub credentials if you are a member of the ``lsst-sqre`` organization.
 
 
+Restarting the DM-EFD manually
+==============================
+
+k3s is configured to automatically start after a system reboot (``--restart-always`` flag). In case you need to start the k3s master manually, first check its status:
+
+.. code-block:: bash
+
+  sudo docker ps -a
+
+If k3s master status is ``Exited`` start with the following command:
+
+.. code-block:: bash
+
+  sudo docker start master
+
+After a few minutes, all Kubernetes pods should be running again:
+
+.. code-block:: bash
+
+  export KUBECONFIG=$(pwd)/k3s.yaml
+  kubectl cluster-info
+  kubectl get pods --all-namespaces
+
+Currently, Kafka writers containers are not managed by Kubernetes and need to be started manually:
+
+.. code-block:: bash
+
+  sudo docker start kafka_writers_kafka_Test_1 kafka_writers_kafka_ATCamera_1 kafka_writers_kafka_ATHeaderService_1  kafka_writers_kafka_ATArchiver_1 kafka_writers_kafka_ATMonochromator_1 kafka_writers_kafka_ATSpectrograph_1 kafka_writers_kafka_Electrometer_1
+
+
 Using the DM-EFD
 ================
 
@@ -308,7 +338,6 @@ The following command initializes a SAL subsystem, deploy the corresponding SAL 
 .. code-block:: bash
 
   helm install --name ATCamera --namespace kafka-efd-apps --set subsystem=ATCamera lsstsqre/kafka-efd-apps
-
 
 Check a SAL transform app
 -------------------------
