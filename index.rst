@@ -48,18 +48,36 @@
 
    **This technote is not yet published.**
 
-   Instructions to deploy and operate the DM-EFD
+   Instructions to deploy and operate the EFD
+
+TL;DR
+=====
+
+Tucson lab deployment
+---------------------
+- Chronograf: https://test-chronograf-efd.lsst.codes/
+- Kafka Schema Registry UI: https://test-schema-registry-efd.lsst.codes/
+- InfluxDB: https://test-influxdb-efd.lsst.codes/
+
+
+Summit deployment
+-----------------
+- Chronograf: https://summit-chronograf-efd.lsst.codes/
+- InfluxDB: https://summit-influxdb-efd.lsst.codes/
+
+
+Follow ``#com-efd`` at LSSTC Slack for updates.
 
 Why are we doing this?
 ======================
 
-The DM-EFD is a solution based on Kafka and InfluxDB for recording telemetry, commands, and events for LSST. It was `prototyped and tested with the simulator for the M1M3 subsystem <https://sqr-029.lsst.io/#live-sal-experiment-with-avro-transformations>`_. The next logical step is to deploy and test the DM-EFD with real hardware.
+The EFD is a solution based on Kafka and InfluxDB for recording telemetry, commands, and events for LSST. It was `prototyped and tested with the simulator for the M1M3 subsystem <https://sqr-029.lsst.io/#live-sal-experiment-with-avro-transformations>`_. The next logical step is to deploy and test the EFD with real hardware.
 
-The Auxilary Telescope Camera (ATCamera) is being tested at the Tucson lab, and it presents an excellent opportunity for testing the DM-EFD by recording data from these tests.
+The Auxilary Telescope Camera (ATCamera) is being tested at the Tucson lab, and it presents an excellent opportunity for testing the EFD by recording data from these tests.
 
-We might need to deploy the DM-EFD at the Summit, Base facility, and LDF. Thus, the ability to deploy the DM-EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, and a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_ to manage and automate the deployments.
+We might need to deploy the EFD at the Summit, Base facility, and LDF. Thus, the ability to deploy the EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, and a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_ to manage and automate the deployments.
 
-In this technote, we demonstrate that we can deploy the DM-EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("kubes"), a lightweight Kubernetes using the same Terraform modules and Helm charts that we used at Google Could. We also provide instructions on how to operate and use the DM-EFD system.
+In this technote, we demonstrate that we can deploy the EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("kubes"), a lightweight Kubernetes using the same Terraform modules and Helm charts that we used at Google Could. We also provide instructions on how to operate and use the EFD system.
 
 The ATCamera test environment
 =============================
@@ -68,7 +86,7 @@ As of June 2019, the ATCamera test environment at the Tucson lab runs SAL 3.9. T
 
 Kafka writers are responsible for sending messages from each SAL topic to the Kafka brokers.
 
-The DM-EFD runs on a dedicated machine ``ts-csc-01 (140.252.32.142)``. The first step to deploy it is to provision a Kubernetes cluster.
+The EFD runs on a dedicated machine ``ts-csc-01 (140.252.32.142)``. The first step to deploy it is to provision a Kubernetes cluster.
 
 Provisioning a k3s ("kubes") cluster
 ====================================
@@ -117,7 +135,7 @@ Data is persisted at ``$HOST_PATH`` with the ``--volume`` option (see also :ref:
 
 The ``--network host`` option routes network traffic from the host to the container, we need that to reach the different services running inside k3s.
 
-Note that we are not deploying `Traefik Ingress Controller` which is included in the k3s docker image, because the DM-EFD already deploys the `NGINX Ingress Controller`.
+Note that we are not deploying `Traefik Ingress Controller` which is included in the k3s docker image, because the EFD already deploys the `NGINX Ingress Controller`.
 
 To connect to the master you need to copy the kubeconfig file from the container, and set the ``KUBECONFIG`` environment variable so that `kubectl` knows how to connect to the cluster:
 
@@ -180,23 +198,23 @@ and start the worker(s):
 
 	By default ``/opt/local-path-provisioner`` is used across all the nodes to store persistent volume data, see `local-path provisioner configuration <https://github.com/rancher/local-path-provisioner#configuration>`_.
 
-Deploy the DM-EFD
+Deploy the EFD
 =================
 
-Once the cluster is ready, we can deploy the DM-EFD.
+Once the cluster is ready, we can deploy the EFD.
 
 Requirements
 ------------
 
  - AWS credentials (we save the deployment configuration to an S3 bucket and create names for our services on Route53)
  - TLS/SSL certificates for the ``lsst.codes`` domain (we share certificates via SQuaRE Dropbox account)
- - Deployment configuration for the DM-EFD test environment (we share secrets via SQuaRE 1Password account)
+ - Deployment configuration for the EFD test environment (we share secrets via SQuaRE 1Password account)
 
 .. note::
 
-  The current mechanism to share secrets and certificates is not ideal. We still need to integrate our DM-EFD deployment with the `Vault service implemented by SQuaRE <https://dmtn-112.lsst.io/>`_.
+  The current mechanism to share secrets and certificates is not ideal. We still need to integrate our EFD deployment with the `Vault service implemented by SQuaRE <https://dmtn-112.lsst.io/>`_.
 
-We automate the deployment of the DM-EFD with `Terraform <https://www.terraform.io/>`_ and `Helm <https://helm.sh/>`_.  `Terragrunt <https://www.gruntwork.io/>`_ is used to manage the different deployment environments (dev, test, and production) while keeping the Terraform modules environment-agnostic. We also use Terragrunt to save the Terraform configuration and the state of a particular deployment remotely.
+We automate the deployment of the EFD with `Terraform <https://www.terraform.io/>`_ and `Helm <https://helm.sh/>`_.  `Terragrunt <https://www.gruntwork.io/>`_ is used to manage the different deployment environments (dev, test, and production) while keeping the Terraform modules environment-agnostic. We also use Terragrunt to save the Terraform configuration and the state of a particular deployment remotely.
 
 Install Terragrunt, Terraform, and Helm.
 
@@ -233,11 +251,11 @@ The following commands initialize the deployment environment. (Terragrunt uses a
 Deployment configuration
 ------------------------
 
-The DM-EFD deployment configuration on k3s is defined by a set of Terraform variables listed in the  `terraform-efd-k3s <https://github.com/lsst-sqre/terraform-efd-k3s>`_ repository.
+The EFD deployment configuration on k3s is defined by a set of Terraform variables listed in the  `terraform-efd-k3s <https://github.com/lsst-sqre/terraform-efd-k3s>`_ repository.
 
 Edit the ``terraform.tfvars`` file with the values obtained from the SQuaRE 1Password account. Search for ``terraform vars (efd test)``.
 
-Finally, deploy the DM-EFD with the following commands:
+Finally, deploy the EFD with the following commands:
 
 .. code-block:: bash
 
@@ -245,32 +263,16 @@ Finally, deploy the DM-EFD with the following commands:
   terragrunt apply
 
 
-Outputs
--------
-
-If everything is correct you should see an output similar to this, indicating the new services deployed:
-
-.. code-block:: bash
-
-  confluent_lb_ips = [140.252.32.142]
-  grafana_fqdn = test-grafana-efd.lsst.codes
-  influxdb_fqdn = test-influxdb-efd.lsst.codes
-  nginx_ingress_ip = 140.252.32.142
-  prometheus_fqdn = test-prometheus-efd.lsst.codes
-
-
-The Kafka cluster can be reached at ``test-efd.lsst.codes:31090``.
-
-Testing the DM-EFD
+Testing the EFD
 ==================
 
-The DM-EFD deployment can be tested using `kafkacat <https://docs.confluent.io/current/app-development/kafkacat-usage.html>`_  a command line utility implemented with ``librdkafka`` the Apache Kafka C/C++ client library.
+The EFD deployment can be tested using `kafkacat <https://docs.confluent.io/current/app-development/kafkacat-usage.html>`_  a command line utility implemented with ``librdkafka`` the Apache Kafka C/C++ client library.
 
 Run in producer mode (-P) to produce messages for a test topic:
 
 .. code-block:: bash
 
-  kafkacat -P -b test-efd.lsst.codes:31090 -t test_topic
+  kafkacat -P -b <kafka broker url> -t test_topic
   Hello EFD!
   ^D
 
@@ -278,22 +280,22 @@ Run in Metadata listing mode (-L) to retrieve metadata from the cluster:
 
 .. code-block:: bash
 
-  kafkacat -L -b test-efd0.lsst.codes:31090
+  kafkacat -L -b <kafka broker url>
 
 The ``-d`` option enables ``librdkafka`` debugging. For instance, ``-d broker`` can be used to debug connection issues with the cluster:
 
 .. code-block:: bash
 
-  kafkacat -L -b test-efd0.lsst.codes:31090 -d broker
+  kafkacat -L -b <kafka broker url>  -d broker
 
 
 Monitoring
 ==========
 
-The DM-EFD deployment includes `dashboards for monitoring the k3s cluster and Kafka <https://test-grafana-efd.lsst.codes>`_ instrumented by `Prometheus <https://test-prometheus-efd.lsst.codes>`_ metrics. You can login with your GitHub credentials if you are a member of the ``lsst-sqre`` organization.
+The EFD deployment includes `dashboards for monitoring the k3s cluster and Kafka <https://test-grafana-efd.lsst.codes>`_ instrumented by `Prometheus <https://test-prometheus-efd.lsst.codes>`_ metrics. You can login with your GitHub credentials if you are a member of the ``lsst-sqre`` organization.
 
 
-Restarting the DM-EFD manually
+Restarting the EFD manually
 ==============================
 
 k3s is configured to automatically start after a system reboot (``--restart-always`` flag). In case you need to start the k3s master manually, first check its status:
@@ -316,68 +318,14 @@ After a few minutes, all Kubernetes pods should be running again:
   kubectl cluster-info
   kubectl get pods --all-namespaces
 
-Currently, Kafka writers containers are not managed by Kubernetes and need to be started manually:
-
-.. code-block:: bash
-
-  sudo docker start kafka_writers_kafka_Test_1 kafka_writers_kafka_ATCamera_1 kafka_writers_kafka_ATHeaderService_1  kafka_writers_kafka_ATArchiver_1 kafka_writers_kafka_ATMonochromator_1 kafka_writers_kafka_ATSpectrograph_1 kafka_writers_kafka_Electrometer_1
 
 
-Using the DM-EFD
-================
+Accessing EFD data
+=====================
 
-In this section, we document some procedures that are useful for operating
-the DM-EFD. Please refer to `DM-EFD prototype implementation based on Kafka and InfluxDB <https://sqr-029.lsst.io>`_ for an overview of the DM-EFD system.
+Use the Chronograf interface for time-series visualization and dashboarding.
 
-
-Initialize a SAL subsystem
---------------------------
-
-The following command initializes a SAL subsystem, deploy the corresponding SAL transform app and configure the InfluxDB Sink Connector to consume the SAL topics of that subsystem. In the example, we initialize the ``ATCamera`` subsystem:
-
-.. code-block:: bash
-
-  helm install --name ATCamera --namespace kafka-efd-apps --set subsystem=ATCamera lsstsqre/kafka-efd-apps
-
-Check a SAL transform app
--------------------------
-
-Inspect the logs of a SAL transform app for a particular subsystem. In this example the ``ATCamera``:
-
-.. code-block:: bash
-
-  kubectl logs $(kubectl get pods --namespace kafka-efd-apps -l "app=saltransform,subsystem=ATCamera" -o jsonpath="{.items[0].metadata.name}") --n kafka-efd-apps
-
-
-Check the InfluxDB Sink connector
----------------------------------
-
-Inspecting the Kafka connect logs:
-
-.. code-block:: bash
-
-  kubectl logs $(kubectl get pods --namespace kafka -l "app=cp-kafka-connect,release=confluent" -o jsonpath="{.items[0].metadata.name}") cp-kafka-connect-server --namespace kafka -f
-
-
-Getting data from the DM-EFD
-----------------------------
-
-InfluxDB provides an `HTTP API <https://docs.influxdata.com/influxdb/v1.7/tools/api/>`_ for accessing the data. Here we show a Python code snippet to get data from a particular SAL topic from the DM-EFD. In the example, we retrieve the `Temperature for CCD 0 in the last 24h`:
-
-.. code-block:: python3
-
-  import requests
-
-  INFLUXDB_API_URL = "https://test-influxdb-efd.lsst.codes"
-  INFLUXDB_DATABASE = "efd"
-
-  def get_topic_data(topic, period="24h"):
-    params={'q': 'SELECT * FROM "{}\"."autogen"."{}" where time > now()-{}'.format(INFLUXDB_DATABASE, topic, period)}
-    r = requests.post(url=INFLUXDB_API_URL + "/query", params=params)
-
-    return r.json()
-
-  get_topic_data("lsst.sal.ATCamera.ccdTemp0")
+In this `notebook <https://github.com/lsst-sqre/notebook-demo/blob/master/experiments/efd/Accessing_EFD_data.ipynb>`_ we we demonstrate how to extract data from the EFD using `aioinflux <https://aioinflux.readthedocs.io/en/stable/index.html>`_, a Python client for InfluxDB, and proceed with data analysis using Pandas dataframes.
 
 
 
