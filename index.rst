@@ -48,7 +48,7 @@
 
    **This technote is not yet published.**
 
-   Instructions to deploy and operate the EFD
+   Instructions on how to deploy the EFD on Kubes, a lightweight Kubernetes.
 
 TL;DR
 =====
@@ -75,16 +75,16 @@ The EFD is a solution based on Kafka and InfluxDB for recording telemetry, comma
 
 The Auxilary Telescope Camera (ATCamera) is being tested at the Tucson lab, and it presents an excellent opportunity for testing the EFD by recording data from these tests.
 
-We might need to deploy the EFD at the Summit, Base facility, and LDF. Thus, the ability to deploy the EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, and a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_ to manage and automate the deployments.
+We might need to deploy the EFD at the Summit, and at LDF. Thus, the ability to deploy the EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, and a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_ to manage and automate the deployments.
 
-In this technote, we demonstrate that we can deploy the EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("kubes"), a lightweight Kubernetes using the same Terraform modules and Helm charts that we used at Google Could. We also provide instructions on how to operate and use the EFD system.
+In this technote, we demonstrate that we can deploy the EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("kubes"), while the final on-premise deployment platform is not ready.
 
-The ATCamera test environment
-=============================
+The ATCamera test environment at the Tucson Lab
+===============================================
 
 As of June 2019, the ATCamera test environment at the Tucson lab runs SAL 3.9. The following subsystems are being tested and produce data: ``ATCamera``, ``ATHeaderService``, ``ATArchiver``, ``ATMonochromator``, ``ATSpectrograph``, and ``Electrometer``.
 
-Kafka writers are responsible for sending messages from each SAL topic to the Kafka brokers.
+The `SAL Kafka <https://ts-salkafka.lsst.io/>`_ producer is responsible for sending messages from each subsystem to the EFD.
 
 The EFD runs on a dedicated machine ``ts-csc-01 (140.252.32.142)``. The first step to deploy it is to provision a Kubernetes cluster.
 
@@ -268,7 +268,7 @@ Testing the EFD
 
 The EFD deployment can be tested using `kafkacat <https://docs.confluent.io/current/app-development/kafkacat-usage.html>`_  a command line utility implemented with ``librdkafka`` the Apache Kafka C/C++ client library.
 
-Run in producer mode (-P) to produce messages for a test topic:
+Run in producer mode (``-P``) to produce messages for a test topic:
 
 .. code-block:: bash
 
@@ -276,7 +276,7 @@ Run in producer mode (-P) to produce messages for a test topic:
   Hello EFD!
   ^D
 
-Run in Metadata listing mode (-L) to retrieve metadata from the cluster:
+Run in metadata listing mode (``-L``) to retrieve metadata from the cluster:
 
 .. code-block:: bash
 
@@ -287,6 +287,12 @@ The ``-d`` option enables ``librdkafka`` debugging. For instance, ``-d broker`` 
 .. code-block:: bash
 
   kafkacat -L -b <kafka broker url>  -d broker
+
+Run in consumer mode (``-C``) to consume topics from the cluster:
+
+.. code-block:: bash
+
+  kafkacat -C -b <kafka broker url> -t <topic name>
 
 
 Monitoring
@@ -325,7 +331,7 @@ Accessing EFD data
 
 Use the Chronograf interface for time-series visualization and dashboarding.
 
-In this `notebook <https://github.com/lsst-sqre/notebook-demo/blob/master/experiments/efd/Accessing_EFD_data.ipynb>`_ we we demonstrate how to extract data from the EFD using `aioinflux <https://aioinflux.readthedocs.io/en/stable/index.html>`_, a Python client for InfluxDB, and proceed with data analysis using Pandas dataframes.
+In this `notebook <https://github.com/lsst-sqre/notebook-demo/blob/master/experiments/efd/Accessing_EFD_data.ipynb>`_ we show how to extract data from the EFD using `aioinflux <https://aioinflux.readthedocs.io/en/stable/index.html>`_, a Python client for InfluxDB, and proceed with data analysis using Pandas dataframes.
 
 
 
