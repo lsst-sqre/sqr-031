@@ -150,7 +150,9 @@ To connect to the master you need to copy the kubeconfig file from the container
 
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 
-To connect to the cluster from another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by ``140.252.32.142``.
+To connect to the cluster from another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by ``140.252.32.142`` for the lab instance and ``139.229.162.114`` for the summit instance.
+
+Note that we will likely also keep current versions of the configuration files in 1Password.  Look for ``k3s-summit.yaml`` and ``k3s-test.yaml``.
 
 .. _local-path-provisioner:
 
