@@ -150,7 +150,9 @@ To connect to the master you need to copy the kubeconfig file from the container
 
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 
-To connect to the cluster from another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by ``140.252.32.142``.
+To connect to the cluster from another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by ``140.252.32.142`` for the lab instance and ``139.229.162.114`` for the summit instance.
+
+Note that we will likely also keep current versions of the configuration files in 1Password.  Look for ``k3s-summit.yaml`` and ``k3s-test.yaml``.
 
 .. _local-path-provisioner:
 
@@ -323,7 +325,42 @@ After a few minutes, all Kubernetes pods should be running again:
   export KUBECONFIG=$(pwd)/k3s.yaml
   kubectl cluster-info
   kubectl get pods --all-namespaces
+  
+  
+Restarting a pod manually
+==============================
 
+Sometimes it's useful to restart just a single pod.  First, configure the environment to that ``kubectl`` will be able to connect to the cluster.  This assumes you have installed ``kubectl``.
+
+.. code-block:: bash
+
+  export KUBECONFIG=<path/to/k3s.yaml>
+
+Now ``kubectl`` can talk to the cluster.  See the cluster status.
+
+.. code-block:: bash
+
+  kubectl cluster-info
+
+See the running pods.
+
+.. code-block:: bash
+
+  kubectl get pods -A
+  
+It's possible to get logs from running containers.  Note that in the case where mutliple containers are running in a pod, you will need to specify both the pod name and the container name.  If you do not provide a container name, the command will produce a list of container names in the case where multiple containers are running in the same pod.
+
+.. code-block:: bash
+
+  kubectl logs <pod-name> -n <namespace> -c <container-name>
+  
+Finally, if a pod needs to be restarted ("bounced") this can be done by simply deleting the pod.  It will respawn automatically.
+
+.. code-block:: bash
+
+  kubectl delete <pod-name> -n <namespace>
+
+In the case of the EFD, we have most often needed to restart the kafka connector pod.  It will have a name like ``confluent-cp-kafka-connect-7f8bbc7c8c-5cmm2`` in the ``kafka`` namespace.
 
 
 Accessing EFD data
