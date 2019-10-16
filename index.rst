@@ -358,7 +358,7 @@ Finally, if a pod needs to be restarted ("bounced") this can be done by simply d
 
 .. code-block:: bash
 
-  kubectl delete <pod-name> -n <namespace>
+  kubectl delete pod <pod-name> -n <namespace>
 
 In the case of the EFD, we have most often needed to restart the kafka connector pod.  It will have a name like ``confluent-cp-kafka-connect-7f8bbc7c8c-5cmm2`` in the ``kafka`` namespace.
 
