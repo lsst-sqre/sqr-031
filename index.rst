@@ -201,7 +201,7 @@ With Argo CD we keep the `EFD deployment configuration on GitHub <https://github
 
 This creates a new namespace, ``argocd``, where Argo CD services and application resources will live.
 
-Follow these instructions to `install Argo CD CLI <https://argoproj.github.io/argo-cd/cli_installation/>`_.
+Follow `these instructions to install Argo CD CLI <https://argoproj.github.io/argo-cd/cli_installation/>`_.
 
 Additional Argo CD configuration includes `Single Sign On (SSO) <https://argoproj.github.io/argo-cd/operator-manual/sso/>`_ and the `Role Based Access Control (RBAC) <https://argoproj.github.io/argo-cd/operator-manual/rbac/>`_.
 
@@ -235,6 +235,8 @@ For example, the following bootstraps an EFD deployment using the configuration 
   argocd app create efd --dest-namespace argocd --dest-server https://kubernetes.default.svc --repo https://github.com/lsst-sqre/argocd-efd.git --path apps/efd --helm-set env=summit
   argocd app sync efd
 
+See the Argo CD getting started guide for further instructions on `how to login using the CLI <https://argoproj.github.io/argo-cd/getting_started/#4-login-using-the-cli>`_.
+
 The secrets used by the EFD are stored on `LSST's Vault Service <https://vault.lsst.codes/>`_ but you need to create at least one secret manually with the VAULT_TOKEN:
 
 .. code-block:: bash
@@ -255,7 +257,7 @@ The EFD deployment can be tested using `kafkacat <https://docs.confluent.io/curr
 
 Run in producer mode (``-P``) to produce messages for a test topic:
 
-.. code-block::
+.. code-block:: bash
 
   kafkacat -P -b <kafka broker url> -t test_topic
   Hello EFD!
@@ -308,7 +310,7 @@ After a few minutes, all Kubernetes pods should be running again:
 Inspecting logs, restarting pods, etc.
 ======================================
 
-You can inspect logs, restart pods and doing other operations including synchronization of the deployment using the Argo CD UI or the CLI.
+You can inspect logs, restart pods and do other operations including synchronization of the deployment using the Argo CD UI or the CLI.
 
 In the case of the EFD, we have most often needed to restart the kafka connector pod ``confluent-cp-kafka-connect`` in the ``cp-helm-charts`` namespace.
 
@@ -317,7 +319,7 @@ Accessing EFD data
 
 Use the Chronograf interface for time-series visualization and dashboarding.
 
-In this `notebook <https://github.com/lsst-sqre/notebook-demo/blob/master/experiments/efd/Accessing_EFD_data.ipynb>`_ we show how to extract data from the EFD using `aioinflux <https://aioinflux.readthedocs.io/en/stable/index.html>`_, a Python client for InfluxDB, and proceed with data analysis using Pandas dataframes.
+In this `notebook <https://github.com/lsst-sqre/notebook-demo/blob/master/experiments/efd/Accessing_EFD_data.ipynb>`_ we show how to access EFD data using `aioinflux <https://aioinflux.readthedocs.io/en/stable/index.html>`_, a Python client for InfluxDB, and proceed with data analysis using Pandas dataframes.
 
 
 
