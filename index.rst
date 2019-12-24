@@ -53,17 +53,14 @@
 TL;DR
 =====
 
-Tucson lab deployment
----------------------
-- Chronograf: https://test-chronograf-efd.lsst.codes/
-- Kafka Schema Registry UI: https://test-schema-registry-efd.lsst.codes/
-- InfluxDB: https://test-influxdb-efd.lsst.codes/
+.. list-table::
 
-
-Summit deployment
------------------
-- Chronograf: https://summit-chronograf-efd.lsst.codes/
-- InfluxDB: https://summit-influxdb-efd.lsst.codes/
+   * - Summit EFD
+     - https://argocd-summit.lsst.codes
+   * - Tucson Teststand EFD
+     - https://argocd-tucson-teststand.lsst.codes
+   * - NCSA Teststand EFD
+     - https://argocd-ncsa-teststand.lsst.codes
 
 
 Follow ``#com-efd`` at LSSTC Slack for updates.
@@ -73,25 +70,15 @@ Why are we doing this?
 
 The EFD is a solution based on Kafka and InfluxDB for recording telemetry, commands, and events for LSST. It was `prototyped and tested with the simulator for the M1M3 subsystem <https://sqr-029.lsst.io/#live-sal-experiment-with-avro-transformations>`_. The next logical step is to deploy and test the EFD with real hardware.
 
-The Auxilary Telescope Camera (ATCamera) is being tested at the Tucson lab, and it presents an excellent opportunity for testing the EFD by recording data from these tests.
+The ability to deploy the EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, `Helm <https://helm.sh/>`_ as the Kubernetes package manager and `Argo CD <https://argoproj.github.io/argo-cd/>`_ as the  continuous delivery tool for Kubernetes.
 
-We might need to deploy the EFD at the Summit, and at LDF. Thus, the ability to deploy the EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Docker <https://www.docker.com/>`_ and `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, and a combination of `Terragrunt <https://www.gruntwork.io/>`_, `Terraform <https://www.terraform.io/>`_, and `Helm <https://helm.sh/>`_ to manage and automate the deployments.
+In this technote, we demonstrate that we can deploy the EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("Kubes") while the final on-premise deployment platform is not ready.
 
-In this technote, we demonstrate that we can deploy the EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("kubes"), while the final on-premise deployment platform is not ready.
-
-The ATCamera test environment at the Tucson Lab
-===============================================
-
-As of June 2019, the ATCamera test environment at the Tucson lab runs SAL 3.9. The following subsystems are being tested and produce data: ``ATCamera``, ``ATHeaderService``, ``ATArchiver``, ``ATMonochromator``, ``ATSpectrograph``, and ``Electrometer``.
-
-The `SAL Kafka <https://ts-salkafka.lsst.io/>`_ producer is responsible for sending messages from each subsystem to the EFD.
-
-The EFD runs on a dedicated machine ``ts-csc-01 (140.252.32.142)``. The first step to deploy it is to provision a Kubernetes cluster.
 
 Provisioning a k3s ("kubes") cluster
 ====================================
 
-`k3s <https://github.com/rancher/k3s>`_ is a lightweight Kubernetes that runs in a container.
+The first step is to provision our Kubernetes cluster.  `K3s <https://github.com/rancher/k3s>`_ is a lightweight Kubernetes that runs in a container.
 
 Requirements
 ------------
@@ -200,79 +187,75 @@ and start the worker(s):
 
 	By default ``/opt/local-path-provisioner`` is used across all the nodes to store persistent volume data, see `local-path provisioner configuration <https://github.com/rancher/local-path-provisioner#configuration>`_.
 
+Install Argo CD
+===============
+
+With Argo CD we keep the `EFD deployment configuration on GitHub <https://github.com/lsst-sqre/argocd-efd>`_. This way we can use GitHub to control changes in the EFD deployments and easily bootstrap new EFD deployments.
+
+
+.. code-block:: bash
+
+  kubectl create namespace argocd
+  kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+
+This creates a new namespace, ``argocd``, where Argo CD services and application resources will live.
+
+Follow these instructions to `install Argo CD CLI <https://argoproj.github.io/argo-cd/cli_installation/>`_.
+
+Additional Argo CD configuration includes `Single Sign On (SSO) <https://argoproj.github.io/argo-cd/operator-manual/sso/>`_ and the `Role Based Access Control (RBAC) <https://argoproj.github.io/argo-cd/operator-manual/rbac/>`_.
+
+In particular, this is the RBAC configuration we added to the ArgoCD ConfigMap ``argocd-rbac-cm`` to let members of the EFD ops team in the ``lsst-sqre`` GitHub organization to synchronize the EFD configuration, while granting read-only permission for other members.
+
+.. code-block:: bash
+
+  data:
+    policy.csv: |
+      p, lsst-sqre:EFD ops, applications, sync, default/*, allow
+
+      g, lsst-sqre:EFD ops, role:admin
+      policy.default: role:readonly
+
+
 Deploy the EFD
-=================
+==============
 
-Once the cluster is ready, we can deploy the EFD.
+Once Argo CD is installed we can deploy the EFD.
 
-Requirements
-------------
+Argo CD manages the deployment of the EFD on multiple environments. The possible environments are ``summit``, ``tucson-teststand``, ``ncsa-teststand``, ``ldf``, and ``gke``.
 
- - AWS credentials (we save the deployment configuration to an S3 bucket and create names for our services on Route53)
- - TLS/SSL certificates for the ``lsst.codes`` domain (we share certificates via SQuaRE Dropbox account)
- - Deployment configuration for the EFD test environment (we share secrets via SQuaRE 1Password account)
+For example, the following bootstraps an EFD deployment using the configuration for the ``summit`` environment:
 
-.. note::
-
-  The current mechanism to share secrets and certificates is not ideal. We still need to integrate our EFD deployment with the `Vault service implemented by SQuaRE <https://dmtn-112.lsst.io/>`_.
-
-We automate the deployment of the EFD with `Terraform <https://www.terraform.io/>`_ and `Helm <https://helm.sh/>`_.  `Terragrunt <https://www.gruntwork.io/>`_ is used to manage the different deployment environments (dev, test, and production) while keeping the Terraform modules environment-agnostic. We also use Terragrunt to save the Terraform configuration and the state of a particular deployment remotely.
-
-Install Terragrunt, Terraform, and Helm.
 
 .. code-block:: bash
 
-  git clone https://github.com/lsst-sqre/terragrunt-live-test.git
-  cd terragrunt-live-test
-  make all
-  export PATH="${PWD}/bin:${PATH}"
+  kubectl port-forward svc/argocd-server -n argocd 8080:443
 
-Install the SSL certificates (this step requires access to the SQuaRE Dropbox account).
+  argocd login localhot:8080
+  argocd app create efd --dest-namespace argocd --dest-server https://kubernetes.default.svc --repo https://github.com/lsst-sqre/argocd-efd.git --path apps/efd --helm-set env=summit
+  argocd app sync efd
 
-.. code-block:: bash
-
-  make tls
-
-
-Initialize the deployment environment
--------------------------------------
-
-The following commands initialize the deployment environment. (Terragrunt uses an S3 bucket to save the deployment configuration, so this step requires the AWS credentials).
+The secrets used by the EFD are stored on `LSST's Vault Service <https://vault.lsst.codes/>`_ but you need to create at least one secret manually with the VAULT_TOKEN:
 
 .. code-block:: bash
 
-  export AWS_ACCESS_KEY_ID=""
-  export AWS_SECRET_ACCESS_KEY=""
+  export VAULT_TOKEN=<vault token>
+  export VAULT_TOKEN_LEASE_DURATION=<vault token lease duration>
 
-  cd afausti/efd
-  make all
-  terragrunt init --terragrunt-source-update
-  terragrunt init
+  kubectl create secret generic vault-secrets-operator --from-literal=VAULT_TOKEN=$VAULT_TOKEN --from-literal=VAULT_TOKEN_LEASE_DURATION=$VAULT_TOKEN_LEASE_DURATION --namespace vault-secrets-operator
 
+Service names for the apps follow the convention ``<app>-<environment>-efd.lsst.codes``, for example, ``chronograf-summit-efd.lsst.codes``
 
-Deployment configuration
-------------------------
-
-The EFD deployment configuration on k3s is defined by a set of Terraform variables listed in the  `terraform-efd-k3s <https://github.com/lsst-sqre/terraform-efd-k3s>`_ repository.
-
-Edit the ``terraform.tfvars`` file with the values obtained from the SQuaRE 1Password account. Search for ``terraform vars (efd test)``.
-
-Finally, deploy the EFD with the following commands:
-
-.. code-block:: bash
-
-  terragrunt plan
-  terragrunt apply
-
+In particular, the broker URL for the Summit EFD is ``kafka-0-summit-efd.lsst.codes:30190``.
 
 Testing the EFD
-==================
+===============
 
 The EFD deployment can be tested using `kafkacat <https://docs.confluent.io/current/app-development/kafkacat-usage.html>`_  a command line utility implemented with ``librdkafka`` the Apache Kafka C/C++ client library.
 
 Run in producer mode (``-P``) to produce messages for a test topic:
 
-.. code-block:: bash
+.. code-block::
 
   kafkacat -P -b <kafka broker url> -t test_topic
   Hello EFD!
@@ -297,11 +280,6 @@ Run in consumer mode (``-C``) to consume topics from the cluster:
   kafkacat -C -b <kafka broker url> -t <topic name>
 
 
-Monitoring
-==========
-
-The EFD deployment includes `dashboards for monitoring the k3s cluster and Kafka <https://test-grafana-efd.lsst.codes>`_ instrumented by `Prometheus <https://test-prometheus-efd.lsst.codes>`_ metrics. You can login with your GitHub credentials if you are a member of the ``lsst-sqre`` organization.
-
 
 Restarting the EFD manually
 ==============================
@@ -325,43 +303,14 @@ After a few minutes, all Kubernetes pods should be running again:
   export KUBECONFIG=$(pwd)/k3s.yaml
   kubectl cluster-info
   kubectl get pods --all-namespaces
-  
-  
-Restarting a pod manually
-==============================
 
-Sometimes it's useful to restart just a single pod.  First, configure the environment to that ``kubectl`` will be able to connect to the cluster.  This assumes you have installed ``kubectl``.
 
-.. code-block:: bash
+Inspecting logs, restarting pods, etc.
+======================================
 
-  export KUBECONFIG=<path/to/k3s.yaml>
+You can inspect logs, restart pods and doing other operations including synchronization of the deployment using the Argo CD UI or the CLI.
 
-Now ``kubectl`` can talk to the cluster.  See the cluster status.
-
-.. code-block:: bash
-
-  kubectl cluster-info
-
-See the running pods.
-
-.. code-block:: bash
-
-  kubectl get pods -A
-  
-It's possible to get logs from running containers.  Note that in the case where mutliple containers are running in a pod, you will need to specify both the pod name and the container name.  If you do not provide a container name, the command will produce a list of container names in the case where multiple containers are running in the same pod.
-
-.. code-block:: bash
-
-  kubectl logs <pod-name> -n <namespace> -c <container-name>
-  
-Finally, if a pod needs to be restarted ("bounced") this can be done by simply deleting the pod.  It will respawn automatically.
-
-.. code-block:: bash
-
-  kubectl delete pod <pod-name> -n <namespace>
-
-In the case of the EFD, we have most often needed to restart the kafka connector pod.  It will have a name like ``confluent-cp-kafka-connect-7f8bbc7c8c-5cmm2`` in the ``kafka`` namespace.
-
+In the case of the EFD, we have most often needed to restart the kafka connector pod ``confluent-cp-kafka-connect`` in the ``cp-helm-charts`` namespace.
 
 Accessing EFD data
 =====================
