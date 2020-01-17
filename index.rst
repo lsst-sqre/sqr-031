@@ -214,7 +214,7 @@ In particular, this is the RBAC configuration we added to the ArgoCD ConfigMap `
       p, lsst-sqre:EFD ops, applications, sync, default/*, allow
 
       g, lsst-sqre:EFD ops, role:admin
-      policy.default: role:readonly
+    policy.default: role:readonly
 
 
 Deploy the EFD
