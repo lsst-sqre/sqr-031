@@ -53,14 +53,20 @@
 TL;DR
 =====
 
+EFD deployments are managed by `Argo CD <https://github.com/lsst-sqre/argocd-efd>`_:
+
 .. list-table::
 
    * - Summit EFD
      - https://argocd-summit.lsst.codes
-   * - Tucson Teststand EFD
+   * - Tucson Test Stand EFD
      - https://argocd-tucson-teststand.lsst.codes
-   * - NCSA Teststand EFD
-     - https://argocd-ncsa-teststand.lsst.codes
+   * - NCSA Test Stand EFD
+     - https://lsst-argocd-nts-efd.ncsa.illinois.edu
+   * - Sandbox EFD
+     - https://argocd-sandbox.lsst.codes
+   * - LDF EFD
+     - (Work in progress)
 
 
 Follow ``#com-efd`` at LSSTC Slack for updates.
@@ -248,7 +254,7 @@ The secrets used by the EFD are stored on `LSST's Vault Service <https://vault.l
 
 Service names for the apps follow the convention ``<app>-<environment>-efd.lsst.codes``, for example, ``chronograf-summit-efd.lsst.codes``
 
-In particular, the broker URL for the Summit EFD is ``kafka-0-summit-efd.lsst.codes:30190``.
+In particular, the broker URL for the Summit EFD is ``kafka-0-summit-efd.lsst.codes:31090``.
 
 Testing the EFD
 ===============
