@@ -59,17 +59,21 @@ EFD deployments are managed by `Argo CD <https://github.com/lsst-sqre/argocd-efd
 
    * - Summit EFD
      - https://argocd-summit.lsst.codes
+   * - Base EFD
+     - https://kueyen.lsst.codes/argo-cd
    * - Tucson Test Stand EFD
      - https://argocd-tucson-teststand.lsst.codes
    * - NCSA Test Stand EFD
      - https://lsst-argocd-nts-efd.ncsa.illinois.edu
+   * - LSP Integration
+     - https://lsst-lsp-int.ncsa.illinois.edu/argo-cd
+   * - LSP Stable
+     - https://lsst-lsp-stable.ncsa.illinois.edu/argo-cd
    * - Sandbox EFD
      - https://argocd-sandbox.lsst.codes
-   * - LDF EFD
-     - (Work in progress)
 
 
-Follow ``#com-efd`` at LSSTC Slack for updates.
+Follow ``#com-square`` at LSSTC Slack for updates.
 
 Why are we doing this?
 ======================
