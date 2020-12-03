@@ -64,7 +64,7 @@ EFD deployments are managed by `Argo CD <https://github.com/lsst-sqre/argocd-efd
    * - Tucson Test Stand EFD
      - https://argocd-tucson-teststand.lsst.codes
    * - NCSA Test Stand EFD
-     - https://lsst-argocd-nts-efd.ncsa.illinois.edu
+     - https://lsst-argocd-nts-efd.ncsa.illinois.edu/argo-cd
    * - LSP Integration
      - https://lsst-lsp-int.ncsa.illinois.edu/argo-cd
    * - LSP Stable
