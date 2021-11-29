@@ -7,14 +7,14 @@
   .. image:: https://zenodo.org/badge/doi/10.5281/zenodo.#####.svg
      :target: http://dx.doi.org/10.5281/zenodo.#####
 
-###############################
-DM-EFD deployment and operation
-###############################
+#####################
+EFD deployment on k3s
+#####################
 
 SQR-031
 =======
 
-Instructions to deploy and operate the DM-EFD 
+Instructions to deploy the EFD on k3s. This setup was used temporarily at the Summit.
 
 **Links:**
 
