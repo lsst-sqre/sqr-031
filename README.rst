@@ -1,27 +1,27 @@
-.. image:: https://img.shields.io/badge/sqr--031-lsst.io-brightgreen.svg
+.. image:: https://img.shields.io/badge/sqr-031-lsst.io-brightgreen.svg
    :target: https://sqr-031.lsst.io
-.. image:: https://travis-ci.org/lsst-sqre/sqr-031.svg
-   :target: https://travis-ci.org/lsst-sqre/sqr-031
+.. image:: https://github.com/lsst/sqr-031/workflows/CI/badge.svg
+   :target: https://github.com/lsst/sqr-031/actions/
 ..
   Uncomment this section and modify the DOI strings to include a Zenodo DOI badge in the README
   .. image:: https://zenodo.org/badge/doi/10.5281/zenodo.#####.svg
      :target: http://dx.doi.org/10.5281/zenodo.#####
 
-#####################
-EFD deployment on k3s
-#####################
+###########################
+EFD deployment instructions
+###########################
 
 SQR-031
 =======
 
-Instructions to deploy the EFD on k3s. This setup was used temporarily at the Summit.
+Instructions to deploy the EFD on k3s.
 
 **Links:**
 
 - Publication URL: https://sqr-031.lsst.io
 - Alternative editions: https://sqr-031.lsst.io/v
-- GitHub repository: https://github.com/lsst-sqre/sqr-031
-- Build system: https://travis-ci.org/lsst-sqre/sqr-031
+- GitHub repository: https://github.com/lsst/sqr-031
+- Build system: https://github.com/lsst/sqr-031/actions/
 
 
 Build this technical note
@@ -31,7 +31,7 @@ You can clone this repository and build the technote locally with `Sphinx`_:
 
 .. code-block:: bash
 
-   git clone https://github.com/lsst-sqre/sqr-031
+   git clone https://github.com/lsst/sqr-031
    cd sqr-031
    pip install -r requirements.txt
    make html
@@ -52,7 +52,7 @@ The `DM reStructuredText Style Guide`_ is a good resource for how we write reStr
 Remember that images and other types of assets should be stored in the ``_static/`` directory of this repository.
 See ``_static/README.rst`` for more information.
 
-The published technote at https://sqr-031.lsst.io will be automatically rebuilt whenever you push your changes to the ``master`` branch on `GitHub <https://github.com/lsst-sqre/sqr-031>`_.
+The published technote at https://sqr-031.lsst.io will be automatically rebuilt whenever you push your changes to the ``main`` branch on `GitHub <https://github.com/lsst/sqr-031>`_.
 
 Updating metadata
 =================
