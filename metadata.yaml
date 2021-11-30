@@ -37,7 +37,7 @@ authors:
 copyright: '2019, Association of Universities for Research in Astronomy'
 
 # Description. A short, 1-2 sentence statemement used by document indices.
-description: 'Instructions on how to deploy the EFD on kubes, a lightweight Kubernetes.'
+description: 'Instructions to deploy the EFD on k3s.'
 
 # Abstract, if available
 # abstract: >
