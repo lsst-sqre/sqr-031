@@ -48,62 +48,49 @@
 
    **This technote is not yet published.**
 
-   Instructions on how to deploy the EFD on Kubes, a lightweight Kubernetes.
+   Instructions on how to deploy the EFD on Kubes (k3s), a lightweight Kubernetes.
 
 TL;DR
 =====
 
-EFD deployments are managed by `Argo CD <https://github.com/lsst-sqre/argocd-efd>`_:
+Summit EFD deployment on k3s managed by `Argo CD <https://argocd-summit.lsst.codes>`_.
 
-.. list-table::
+If you need help, please drop a line on the ``#com-square-support`` LSSTC Slack channel.
 
-   * - Summit EFD
-     - https://argocd-summit.lsst.codes
-   * - Base EFD
-     - https://kueyen.lsst.codes/argo-cd
-   * - Tucson Test Stand EFD
-     - https://argocd-tucson-teststand.lsst.codes
-   * - NCSA Test Stand EFD
-     - https://lsst-argocd-nts-efd.ncsa.illinois.edu/argo-cd
-   * - LSP Integration
-     - https://lsst-lsp-int.ncsa.illinois.edu/argo-cd
-   * - LSP Stable
-     - https://lsst-lsp-stable.ncsa.illinois.edu/argo-cd
-   * - Sandbox EFD
-     - https://argocd-sandbox.lsst.codes
-
-
-Follow ``#com-square`` at LSSTC Slack for updates.
 
 Why are we doing this?
 ======================
 
-The EFD is a solution based on Kafka and InfluxDB for recording telemetry, commands, and events for LSST. It was `prototyped and tested with the simulator for the M1M3 subsystem <https://sqr-029.lsst.io/#live-sal-experiment-with-avro-transformations>`_. The next logical step is to deploy and test the EFD with real hardware.
+The EFD system is based on Kafka and InfluxDB to record telemetry, commands, and events for the Rubin Observatory.
+It was `prototyped and tested with the simulator for the M1M3 subsystem <https://sqr-029.lsst.io/#live-sal-experiment-with-avro-transformations>`_.
+The next logical step is to deploy and test it with real hardware at the Summit.
 
-The ability to deploy the EFD at different environments quickly and reproduce these deployments is crucial.  To solve this problem we've adopted `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, `Helm <https://helm.sh/>`_ as the Kubernetes package manager and `Argo CD <https://argoproj.github.io/argo-cd/>`_ as the  continuous delivery tool for Kubernetes.
+The ability to deploy the EFD at different environments quickly and reproduce these deployments is crucial.
+To solve this problem we've adopted `Kubernetes <https://kubernetes.io/>`_ as our deployment platform, `Helm <https://helm.sh/>`_ as the Kubernetes package manager and `Argo CD <https://argoproj.github.io/argo-cd/>`_ as the  continuous delivery tool for Kubernetes.
 
-In this technote, we demonstrate that we can deploy the EFD on a single machine with Docker and `k3s  <https://github.com/rancher/k3s>`_ ("Kubes") while the final on-premise deployment platform is not ready.
+In this technote, we demonstrate that we can deploy the EFD on a single machine with Docker and `k3s <https://github.com/rancher/k3s>`_  while the final on-premise production cluster is not ready to receive the EFD.
 
 
-Provisioning a k3s ("kubes") cluster
-====================================
+Provisioning a k3s cluster
+==========================
 
-The first step is to provision our Kubernetes cluster.  `K3s <https://github.com/rancher/k3s>`_ is a lightweight Kubernetes that runs in a container.
+The first step is to provision our Kubernetes cluster.
+`k3s <https://github.com/rancher/k3s>`_ is a lightweight Kubernetes that runs in a container, and `k3d <https://k3d.io>`_ is a helper tool to install k3s.
 
 Requirements
 ------------
 
 We assume a Linux box running Centos 7. We've installed `Docker CE <https://docs.docker.com/install/linux/docker-ce/centos/>`_ and `kubectl <https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-on-linux>`_:
 
- - Docker CE 18.09.6
- - kubectl 1.14.1
+  - Docker CE 20.10.10
+  - kubectl 1.22.3
 
 .. note::
 
-  We also tried k3s locally, on Docker Desktop for Mac, but it `can not route traffic from the host to the container <https://docs.docker.com/docker-for-mac/networking/>`_ (the ``--network host`` option does not work).
+  If you try these instructions locally, note that on Docker Desktop for Mac you `cannot route traffic from the host to the container <https://docs.docker.com/docker-for-mac/networking/>`_ (the ``--network host`` option does not work).
 
-Configure Docker to start on boot
----------------------------------
+Configure Docker to start up on boot
+------------------------------------
 
 CentOS uses ``systemd`` to manage which services start when the system boots. Run the following to configure Docker to start on boot.
 
@@ -112,90 +99,65 @@ CentOS uses ``systemd`` to manage which services start when the system boots. Ru
   sudo systemctl enable docker
 
 
-Run the k3s master
-------------------
+Install k3d
+-----------
 
-Run the k3s master with the following commands:
+We've installed:
 
-.. code-block:: bash
-
-  export K3S_PORT=6443
-  export K3S_URL=http://localhost:${K3S_PORT}
-  export K3S_TOKEN=$(date | base64)
-  export HOST_PATH=/data # change depending on your host
-  export CONTAINER_PATH=/opt/local-path-provisioner
-  sudo docker run  -d --restart always --tmpfs /run --tmpfs /var/run --volume ${HOST_PATH}:${CONTAINER_PATH} -e K3S_URL=${K3S_URL} -e K3S_TOKEN=${K3S_TOKEN} --privileged --network host --name master docker.io/rancher/k3s:v0.5.0-rc1 server --https-listen-port ${K3S_PORT} --no-deploy traefik
-
-The  ``--restart always`` option ensures that the k3s master is `automatically restarted <https://docs.docker.com/config/containers/start-containers-automatically/>`_ after a system reboot.
-
-Data is persisted at ``$HOST_PATH`` with the ``--volume`` option (see also :ref:`local-path-provisioner`).
-
-The ``--network host`` option routes network traffic from the host to the container, we need that to reach the different services running inside k3s.
-
-Note that we are not deploying `Traefik Ingress Controller` which is included in the k3s docker image, because the EFD already deploys the `NGINX Ingress Controller`.
-
-To connect to the master you need to copy the kubeconfig file from the container, and set the ``KUBECONFIG`` environment variable so that `kubectl` knows how to connect to the cluster:
+  - k3d version v5.1.0
+  - k3s version v1.21.5-k3s2 (default)
 
 .. code-block:: bash
 
-  sudo docker cp master:/etc/rancher/k3s/k3s.yaml k3s.yaml
+  curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
+
+
+Create the EFD cluster
+----------------------
+
+Create the EFD cluster with the following commands:
+
+.. code-block:: bash
+
+  export HOST_PATH=/data
+  export CONTAINER_PATH=/var/lib/rancher/k3s/storage/
+
+  sudo /usr/local/bin/k3d cluster create efd  --network host --no-lb --volume ${HOST_PATH}:${CONTAINER_PATH} --k3s-arg "--disable=traefik"
+
+This command creates a cluster with only one node.
+
+k3d ensures that the k3s container is automatically restarted after a system reboot.
+
+k3d already deploys `local-path-provisioner <https://github.com/rancher/local-path-provisioner>`_.
+Data is persisted at ``$HOST_PATH`` with the ``--volume`` option.
+However you have to patch the persistent volumes later to change the reclaim policy to ``retain`` (the default is ``delete``).
+
+The ``--network host`` option routes network traffic from the host to the k3s container, we need that to reach the different services running inside k3s using port ``443``.
+
+Note that we are not deploying Traefik Ingress Controller which is the default option in k3d. We deploy the NGINX Ingress Controller with the EFD instead.
+
+To connect to the cluster you need to copy the kubeconfig file from the container, and set the ``KUBECONFIG`` environment variable so that ``kubectl`` knows how to connect to the cluster:
+
+.. code-block:: bash
+
+  sudo /usr/local/bin/k3d kubeconfig get efd > k3s.yaml
   export KUBECONFIG=$(pwd)/k3s.yaml
+
   kubectl cluster-info
 
-  Kubernetes master is running at https://localhost:6443
-  CoreDNS is running at https://localhost:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+  Kubernetes control plane is running at https://0.0.0.0:6443
+  CoreDNS is running at https://0.0.0.0:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+  Metrics-server is running at https://0.0.0.0:6443/api/v1/namespaces/kube-system/services/https:metrics-server:/proxy
 
-  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'
 
-To connect to the cluster from another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by ``140.252.32.142`` for the lab instance and ``139.229.162.114`` for the summit instance.
-
-Note that we will likely also keep current versions of the configuration files in 1Password.  Look for ``k3s-summit.yaml`` and ``k3s-test.yaml``.
-
-.. _local-path-provisioner:
-
-Deploy the local-path provisioner
----------------------------------
-
-The `local-path provisioner <https://github.com/rancher/local-path-provisioner>`_ creates ``hostPath`` persistent volumes on the node automatically. The directory ``/opt/local-path-provisioner`` is used as the path for provisioning. The provisioner is installed in the ``local-path-storage`` namespace by default.
-
-
-.. code-block:: bash
-
-  kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
-
-At this point you should see the following pods running in the cluster:
-
-.. code-block:: bash
-
-  kubectl get pods --all-namespaces
-  NAMESPACE            NAME                                      READY   STATUS    RESTARTS   AGE
-  kube-system          coredns-695688789-r9gkt                   1/1     Running   0          5m
-  local-path-storage   local-path-provisioner-5d4b898474-vz2np   1/1     Running   0          4s
+To connect to the cluster from another machine, copy the ``k3s.yaml`` file and replace ``localhost`` by the machine IP address.
 
 
 Add workers (optional)
 ----------------------
 
-If there are other machines, you can easily add workers to the cluster. Copy the ``node-token`` from the master:
-
-.. code-block:: bash
-
-  sudo docker cp master:/var/lib/rancher/k3s/server/node-token node-token
-
-and start the worker(s):
-
-.. code-block:: bash
-
-  export SERVER_URL=https://<master external IP>:${K3S_PORT}
-  export NODE_TOKEN=$(cat node-token)
-  export WORKER=kube-0
-  export HOST_PATH=/data # change depending on your host
-  export CONTAINER_PATH=/opt/local-path-provisioner
-  sudo docker run -d --tmpfs /run --tmpfs /var/run -v ${HOST_PATH}:${CONTAINER_PATH} -e K3S_URL=${SERVER_URL} -e K3S_TOKEN=${NODE_TOKEN} --privileged --name ${WORKER} rancher/k3s:v0.5.0-rc1
-
-.. note::
-
-	By default ``/opt/local-path-provisioner`` is used across all the nodes to store persistent volume data, see `local-path provisioner configuration <https://github.com/rancher/local-path-provisioner#configuration>`_.
+If there are other machines available, you might want to add more servers to the cluster.  Refer to the `k3d documentation <https://k3d.io/v5.1.0/usage/multiserver/>`_ on how to create a multi-server cluster.
 
 Install Argo CD
 ===============
@@ -207,7 +169,6 @@ With Argo CD we keep the `EFD deployment configuration on GitHub <https://github
 
   kubectl create namespace argocd
   kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
 
 This creates a new namespace, ``argocd``, where Argo CD services and application resources will live.
 
@@ -232,33 +193,71 @@ Deploy the EFD
 
 Once Argo CD is installed we can deploy the EFD.
 
-Argo CD manages the deployment of the EFD on multiple environments. The possible environments are ``summit``, ``tucson-teststand``, ``ncsa-teststand``, ``ldf``, and ``gke``.
+Argo CD manages the deployment of the EFD on multiple environments.
 
 For example, the following bootstraps an EFD deployment using the configuration for the ``summit`` environment:
-
 
 .. code-block:: bash
 
   kubectl port-forward svc/argocd-server -n argocd 8080:443
 
-  argocd login localhot:8080
+  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+
+  argocd login --insecure localhost:8080
   argocd app create efd --dest-namespace argocd --dest-server https://kubernetes.default.svc --repo https://github.com/lsst-sqre/argocd-efd.git --path apps/efd --helm-set env=summit
+
   argocd app sync efd
 
 See the Argo CD getting started guide for further instructions on `how to login using the CLI <https://argoproj.github.io/argo-cd/getting_started/#4-login-using-the-cli>`_.
 
-The secrets used by the EFD are stored on `LSST's Vault Service <https://vault.lsst.codes/>`_ but you need to create at least one secret manually with the VAULT_TOKEN:
+The secrets used by the EFD are stored on `LSST's Vault Service <https://vault.lsst.codes/>`_ but you need to create at least one secret manually with the Vault read token for this environment.
+
+Sync the ``vault-secrets-operator`` app:
+
+.. code-block:: bash
+
+  argocd app sync vault-secrets-operator
 
 .. code-block:: bash
 
   export VAULT_TOKEN=<vault token>
-  export VAULT_TOKEN_LEASE_DURATION=<vault token lease duration>
+  export VAULT_TOKEN_LEASE_DURATION=8640
 
   kubectl create secret generic vault-secrets-operator --from-literal=VAULT_TOKEN=$VAULT_TOKEN --from-literal=VAULT_TOKEN_LEASE_DURATION=$VAULT_TOKEN_LEASE_DURATION --namespace vault-secrets-operator
 
-Service names for the apps follow the convention ``<app>-<environment>-efd.lsst.codes``, for example, ``chronograf-summit-efd.lsst.codes``
+Sync the ``ingress-nginx`` app:
 
-In particular, the broker URL for the Summit EFD is ``kafka-0-summit-efd.lsst.codes:31090``.
+.. code-block:: bash
+
+  argocd app sync ingress-nginx
+
+Finally sync the other apps either using Argo CD CLI or the GUI.
+
+Create the `tls-certs` secret for Argo CD:
+
+.. code-block:: bash
+
+  cat << EOF | kubectl apply -f -
+  apiVersion: ricoberger.de/v1alpha1
+  kind: VaultSecret
+  metadata:
+    name: argocd-server-tls
+    namespace: argocd
+  spec:
+    path: secret/k8s_operator/summit-lsp.lsst.codes/efd/tls-certs
+    type: Opaque
+  EOF
+
+Service names follow the convention ``<app>-<environment>-efd.lsst.codes``, for example, ``chronograf-summit-efd.lsst.codes``
+
+Change reclaim policy of new volumes to retain
+
+.. code-block:: bash
+
+  kubectl patch pv <new pv> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+
+
+For Kafka, the broker URL for the Summit EFD is ``kafka-0-summit-efd.lsst.codes:31090``.
 
 Testing the EFD
 ===============
@@ -292,21 +291,21 @@ Run in consumer mode (``-C``) to consume topics from the cluster:
   kafkacat -C -b <kafka broker url> -t <topic name>
 
 
-
 Restarting the EFD manually
 ==============================
 
-k3s is configured to automatically start after a system reboot (``--restart-always`` flag). In case you need to start the k3s master manually, first check its status:
+k3d ensures k3s automatically starts after a system reboot.
+In case you need to start the k3s container manually, first check its status:
 
 .. code-block:: bash
 
   sudo docker ps -a
 
-If k3s master status is ``Exited`` start with the following command:
+If the k3s container status is ``Exited``, start it with the following command:
 
 .. code-block:: bash
 
-  sudo docker start master
+  sudo docker start <k3s container name>
 
 After a few minutes, all Kubernetes pods should be running again:
 
@@ -327,14 +326,9 @@ In the case of the EFD, we have most often needed to restart the kafka connector
 Accessing EFD data
 =====================
 
-Use the Chronograf interface for time-series visualization and dashboarding.
+Use the Chronograf UI for data visualization and dashboarding.
 
-In this `notebook <https://github.com/lsst-sqre/notebook-demo/blob/master/experiments/efd/Accessing_EFD_data.ipynb>`_ we show how to access EFD data using `aioinflux <https://aioinflux.readthedocs.io/en/stable/index.html>`_, a Python client for InfluxDB, and proceed with data analysis using Pandas dataframes.
-
-
-
-
-
+In this `notebook <https://github.com/lsst-sqre/notebook-demo/blob/master/experiments/efd/Accessing_EFD_data.ipynb>`_ we show how to access EFD data using the EFD Python client, and proceed with data analysis using Pandas dataframes.
 
 
 .. Add content here.
